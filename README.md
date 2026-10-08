@@ -22,6 +22,10 @@ Static company website for **Parxyz** (parxyz.uk), hosted on GitHub Pages. Plain
 2. Run `python3 scripts/build_publications.py`.
 3. Commit and push. GitHub Pages redeploys automatically.
 
+## Logo
+
+`assets/img/logo-mark.svg` is the Parxyz mark as a clean vector (white on transparent). `favicon.svg` and the inline header/footer logo place it on a dark `#222` tile. `logo.png` (512 px) and `apple-touch-icon.png` (180 px) reproduce the original artwork's red/blue channel-split effect.
+
 ## Product images
 
 The images in `assets/img/` (`hero.webp`, `guardian.webp`, `guardian-detail.webp`, `steady.webp`, `home.webp`) are procedural 3D concept renders, not photographs. To replace one with a real photo, keep the same file name and size ratio, or update the `<img>` tag in `index.html`. Transparent-background images sit on the coloured card backgrounds defined in `assets/css/style.css`.
