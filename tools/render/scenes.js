@@ -320,6 +320,136 @@ function capsule(r, len, mat) {
   return m;
 }
 
+// Capsule spanning two points, for limbs posed by joint positions.
+function limbBetween(a, b, r, mat) {
+  const dir = b.clone().sub(a);
+  const len = dir.length();
+  const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, Math.max(len, 0.001), 12, 48), mat);
+  m.position.copy(a).add(b).multiplyScalar(0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+  m.castShadow = m.receiveShadow = true;
+  return m;
+}
+
+// Two-bone IK: elbow/knee position for a limb from s to t, bending towards pole.
+function solveElbow(s, t, l1, l2, pole) {
+  const d = Math.min(s.distanceTo(t), l1 + l2 - 1e-3);
+  const dir = t.clone().sub(s).normalize();
+  const a = (l1 * l1 + d * d - l2 * l2) / (2 * d);
+  const h = Math.sqrt(Math.max(l1 * l1 - a * a, 0));
+  const p = pole.clone().sub(dir.clone().multiplyScalar(pole.dot(dir))).normalize();
+  return s.clone().add(dir.multiplyScalar(a)).add(p.multiplyScalar(h));
+}
+
+function makeArmchair(color = "#c8a083") {
+  const chair = new THREE.Group();
+  const cloth = fabric(color, 3, 3, { ns: 0.5 });
+  const box = (w, h, d, r, x, y, z) => {
+    const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 8, r), cloth);
+    m.position.set(x, y, z);
+    m.castShadow = m.receiveShadow = true;
+    chair.add(m);
+  };
+  box(1.3, 0.62, 1.2, 0.12, 0, 0.39, 0);        // base
+  box(1.08, 0.3, 1.05, 0.13, 0, 0.82, 0.04);   // seat cushion
+  box(1.3, 1.3, 0.32, 0.15, 0, 1.2, -0.5);     // backrest
+  box(0.26, 0.52, 1.2, 0.12, -0.6, 0.94, 0);   // armrests
+  box(0.26, 0.52, 1.2, 0.12, 0.6, 0.94, 0);
+  const wood = new THREE.MeshPhysicalMaterial({ color: "#5b4636", roughness: 0.5 });
+  [[-0.55, -0.5], [0.55, -0.5], [-0.55, 0.5], [0.55, 0.5]].forEach(([x, z]) => {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.1, 16), wood);
+    leg.position.set(x, 0.05, z);
+    chair.add(leg);
+  });
+  return chair;
+}
+
+// A stylised older adult, seated in the chair's local frame (facing +z).
+// handTarget (chair-local) is where the reaching (left) hand should rest.
+function makeSeatedPerson(seat, handTarget) {
+  const sweater = fabric("#9aa58f", 6, 6);
+  const trousers = fabric("#7d7468", 4, 4, { ns: 0.4 });
+  const skin = new THREE.MeshPhysicalMaterial({ color: "#dfbca2", roughness: 0.62, sheen: 0.4, sheenColor: new THREE.Color("#fff1e6") });
+  const hairMat = fabric("#d4d3cf", 10, 6, { map: RIB, ns: 0.5 });
+  const shoeMat = new THREE.MeshPhysicalMaterial({ color: "#5f5a54", roughness: 0.7 });
+  const add = (m) => { m.castShadow = m.receiveShadow = true; seat.add(m); return m; };
+  const v = (x, y, z) => new THREE.Vector3(x, y, z);
+
+  // legs
+  [-1, 1].forEach((side) => {
+    const hip = v(side * 0.17, 1.12, -0.22), knee = v(side * 0.2, 1.13, 0.6), ankle = v(side * 0.21, 0.24, 0.7);
+    add(limbBetween(hip, knee, 0.155, trousers));
+    add(limbBetween(knee, ankle, 0.13, trousers));
+    const shoe = add(new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.14, 0.36, 6, 0.06), shoeMat));
+    shoe.position.set(side * 0.21, 0.08, 0.8);
+  });
+  const pelvis = add(new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), trousers));
+  pelvis.scale.set(0.37, 0.22, 0.32);
+  pelvis.position.set(0, 1.16, -0.2);
+
+  // torso, leaning a little forward and turned toward the robot
+  const torso = new THREE.Group();
+  torso.position.set(0, 1.12, -0.22);
+  torso.rotation.set(0.16, 0.42, 0, "YXZ");
+  seat.add(torso);
+  const prof = new THREE.SplineCurve([
+    new THREE.Vector2(0.33, 0), new THREE.Vector2(0.35, 0.25), new THREE.Vector2(0.39, 0.55),
+    new THREE.Vector2(0.39, 0.78), new THREE.Vector2(0.3, 0.95), new THREE.Vector2(0.14, 1.02), new THREE.Vector2(0.001, 1.04),
+  ]).getPoints(120);
+  const body = new THREE.Mesh(new THREE.LatheGeometry(prof, 160), sweater);
+  body.scale.set(1, 1, 0.74);
+  body.castShadow = body.receiveShadow = true;
+  torso.add(body);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.1, 0.22, 32), skin);
+  neck.position.y = 1.1;
+  torso.add(neck);
+
+  // head with grey hair, a bun and round glasses
+  const head = new THREE.Group();
+  head.position.set(0, 1.46, 0.02);
+  head.rotation.set(0.22, 0.38, 0.05, "YXZ");
+  torso.add(head);
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.31, 96, 64), skin);
+  skull.scale.set(0.94, 1.05, 1);
+  skull.castShadow = true;
+  head.add(skull);
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.325, 96, 64, 0, Math.PI * 2, 0, 1.45), hairMat);
+  hair.scale.set(0.95, 1.06, 1.02);
+  hair.rotation.x = -0.42;
+  hair.castShadow = true;
+  head.add(hair);
+  const bun = new THREE.Mesh(new THREE.SphereGeometry(0.12, 48, 32), hairMat);
+  bun.position.set(0, 0.2, -0.27);
+  head.add(bun);
+  const frame = new THREE.MeshPhysicalMaterial({ color: "#3b3936", roughness: 0.35 });
+  [-1, 1].forEach((side) => {
+    const lens = new THREE.Mesh(new THREE.TorusGeometry(0.068, 0.011, 16, 48), frame);
+    lens.position.set(side * 0.1, 0.0, 0.3);
+    lens.rotation.y = side * 0.18;
+    head.add(lens);
+  });
+  const bridge = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.07, 8), frame);
+  bridge.rotation.z = Math.PI / 2;
+  bridge.position.set(0, 0.015, 0.315);
+  head.add(bridge);
+
+  // arms: left reaches the robot, right rests on the lap
+  seat.updateMatrixWorld(true);
+  const toSeat = (obj, p) => seat.worldToLocal(obj.localToWorld(p.clone()));
+  const shoulderL = toSeat(torso, v(0.36, 0.86, 0)), shoulderR = toSeat(torso, v(-0.36, 0.86, 0));
+  const arm = (shoulder, hand, pole) => {
+    const elbow = solveElbow(shoulder, hand, 0.6, 0.56, pole);
+    add(new THREE.Mesh(new THREE.SphereGeometry(0.125, 32, 24), sweater)).position.copy(shoulder);
+    add(limbBetween(shoulder, elbow, 0.115, sweater));
+    add(limbBetween(elbow, hand, 0.1, sweater));
+    const h = add(new THREE.Mesh(new THREE.SphereGeometry(1, 32, 24), skin));
+    h.scale.set(0.1, 0.075, 0.12);
+    h.position.copy(hand);
+  };
+  arm(shoulderL, handTarget, v(0.6, -1, -0.2));
+  arm(shoulderR, v(-0.1, 1.34, 0.32), v(-1, -0.6, 0));
+}
+
 function sensorPod(kind) {
   const g = new THREE.Group();
   const ceramic = new THREE.MeshPhysicalMaterial({ color: "#f4f2ee", roughness: 0.32, clearcoat: 0.5, clearcoatRoughness: 0.2 });
@@ -431,6 +561,38 @@ const SCENES = {
     const cam = new THREE.PerspectiveCamera(22, W / H, 0.1, 100);
     cam.position.set(1.0, 1.35, 7.4);
     cam.lookAt(0, 1.02, 0);
+    return cam;
+  },
+
+  hero() {
+    // armchair with a seated older adult, Guardian beside them
+    const seat = new THREE.Group();
+    seat.position.set(-0.55, 0, -0.35);
+    seat.rotation.y = 0.58;
+    scene.add(seat);
+    seat.add(makeArmchair());
+    seat.updateMatrixWorld(true);
+
+    const bot = makeGuardian();
+    bot.position.copy(seat.localToWorld(new THREE.Vector3(1.08, 0, 1.18)));
+    bot.rotation.y = -0.18;
+    scene.add(bot);
+    bot.updateMatrixWorld(true);
+
+    // rest the hand on the upper back of Guardian's head, on the side facing the person
+    const headCentre = bot.localToWorld(new THREE.Vector3(0, 1.64, 0));
+    const towards = seat.localToWorld(new THREE.Vector3(0.36, 2.0, -0.1)).sub(headCentre).setY(0).normalize();
+    const touch = headCentre.clone().add(towards.multiplyScalar(0.34)).add(new THREE.Vector3(0, 0.36, 0));
+    makeSeatedPerson(seat, seat.worldToLocal(touch));
+
+    ground(0.17);
+    contactShadow(1.0, 0.8, 0.4, bot.position.x, bot.position.z);
+    const chairPos = seat.position;
+    contactShadow(1.2, 1.0, 0.38, chairPos.x, chairPos.z);
+    lights({ key: [-1.5, 7.5, 4.5], keyI: 2.1, rim: [4, 3.5, -3.5], rimI: 1.4 });
+    const cam = new THREE.PerspectiveCamera(26, W / H, 0.1, 100);
+    cam.position.set(-0.2, 2.5, 8.3);
+    cam.lookAt(-0.72, 1.55, 0);
     return cam;
   },
 

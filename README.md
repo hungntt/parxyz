@@ -24,7 +24,7 @@ Static company website for **Parxyz** (parxyz.uk), hosted on GitHub Pages. Plain
 
 ## Product images
 
-The images in `assets/img/` (`guardian.webp`, `guardian-detail.webp`, `steady.webp`, `home.webp`) are procedural 3D concept renders, not photographs. To replace one with a real photo, keep the same file name and size ratio, or update the `<img>` tag in `index.html`. Transparent-background images sit on the coloured card backgrounds defined in `assets/css/style.css`.
+The images in `assets/img/` (`hero.webp`, `guardian.webp`, `guardian-detail.webp`, `steady.webp`, `home.webp`) are procedural 3D concept renders, not photographs. To replace one with a real photo, keep the same file name and size ratio, or update the `<img>` tag in `index.html`. Transparent-background images sit on the coloured card backgrounds defined in `assets/css/style.css`.
 
 To re-render after editing `tools/render/scenes.js`:
 
@@ -34,7 +34,7 @@ node tools/render/capture.mjs guardian 1800 2250 /tmp/guardian.png
 python3 tools/render/finish.py /tmp/guardian.png assets/img/guardian.webp 1200 1500
 ```
 
-Scenes: `guardian` (hero, 1200x1500), `guardianDetail` (1800x1200, use `--no-feather`), `steady` and `home` (1800x1200). Keep each render at or below 2400 px wide; larger canvases are clipped by the software renderer.
+Scenes: `hero` (person with Guardian, 2400x1350), `guardian` (social preview and 404 page, 1200x1500), `guardianDetail` (1800x1200, use `--no-feather`), `steady` and `home` (1800x1200). Keep each render at or below 2400 px wide; larger canvases are clipped by the software renderer.
 
 ## Preview locally
 
