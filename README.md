@@ -24,7 +24,7 @@ Static company website for **Parxyz** (parxyz.uk), hosted on GitHub Pages. Plain
 
 ## Product images
 
-The images in `assets/img/` (`guardian.webp`, `guardian-detail.webp`, `heart2mind.webp`, `home.webp`) are procedural 3D concept renders, not photographs. To replace one with a real photo, keep the same file name and size ratio, or update the `<img>` tag in `index.html`. Transparent-background images sit on the coloured card backgrounds defined in `assets/css/style.css`.
+The images in `assets/img/` (`guardian.webp`, `guardian-detail.webp`, `steady.webp`, `home.webp`) are procedural 3D concept renders, not photographs. To replace one with a real photo, keep the same file name and size ratio, or update the `<img>` tag in `index.html`. Transparent-background images sit on the coloured card backgrounds defined in `assets/css/style.css`.
 
 To re-render after editing `tools/render/scenes.js`:
 
