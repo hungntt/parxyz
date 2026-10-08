@@ -282,10 +282,13 @@ a.pub-title:hover { text-decoration: underline; text-underline-offset: 3px; text
 .affils h3 { margin-top: 10px; font-size: 18px; letter-spacing: -0.02em; line-height: 1.25; }
 .affils p { margin-top: 8px; font-size: 13px; color: var(--muted); }
 .people { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-width: 1400px; margin: 16px auto 0; padding: 0 var(--gutter); }
-.person { display: flex; align-items: center; gap: 20px; padding: 28px 32px; }
+.person { display: flex; flex-direction: column; padding: 28px 32px; }
+.person-top { display: flex; align-items: center; gap: 18px; }
 .person .avatar { width: 64px; height: 64px; flex: none; font-size: 20px; }
 .person h3 { font-size: 18px; letter-spacing: -0.02em; line-height: 1.25; }
 .person .role { margin-top: 4px; color: var(--accent); }
+.person .bio { margin-top: 18px; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
+.person .links { margin-top: auto; padding-top: 18px; }
 @media (max-width: 900px) { .people { grid-template-columns: 1fr; } }
 .fineprint { max-width: 1400px; margin: 20px auto 0; padding: 0 var(--gutter); font-size: 12px; color: var(--ink-3); }
 @media (max-width: 900px) { .team { padding-top: 120px; } .team-grid { grid-template-columns: 1fr; } }

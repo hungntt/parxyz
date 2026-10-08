@@ -1,5 +1,5 @@
 // Procedural concept renders for the Parxyz website.
-// Open index.html?scene=guardian|wearable|home&w=1400&h=1800 through a local web server;
+// Open index.html?scene=guardian|guardianDetail|steady|home&w=1400&h=1800 through a local web server;
 // capture.mjs saves the canvas as a transparent PNG.
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
@@ -183,9 +183,9 @@ function pulse(t) {
   return y;
 }
 
-function pulseLine(pointAt, { radius = 0.0055, color = TEAL, glowR = 0.018, dot = true } = {}) {
+function pulseLine(pointAt, { radius = 0.0055, color = TEAL, glowR = 0.018, dot = true, wave = pulse } = {}) {
   const pts = [];
-  for (let i = 0; i <= 400; i++) pts.push(pointAt(i / 400, pulse(i / 400)));
+  for (let i = 0; i <= 400; i++) pts.push(pointAt(i / 400, wave(i / 400)));
   const curve = new THREE.CatmullRomCurve3(pts, false, "centripetal");
   const g = new THREE.Group();
   g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 800, radius, 10), new THREE.MeshBasicMaterial({ color, toneMapped: false })));
@@ -281,6 +281,151 @@ function makeGuardian({ color = "#c9bdab" } = {}) {
   return root;
 }
 
+// Slow, even wave for Steady's face: a calm breathing rhythm rather than a heartbeat.
+function breath(t) {
+  const env = Math.sin(Math.PI * t) ** 1.5;
+  return 0.42 * env * Math.sin(2 * Math.PI * 2.25 * t);
+}
+
+function capsule(r, len, mat) {
+  const g = new THREE.CapsuleGeometry(r, len, 12, 48);
+  g.translate(0, -len / 2, 0); // pivot at the top cap centre
+  const m = new THREE.Mesh(g, mat);
+  m.castShadow = true;
+  return m;
+}
+
+function makeHumanoid({ color = "#cdc3b2" } = {}) {
+  const root = new THREE.Group();
+  const knit = (rx, ry) => fabric(color, rx, ry);
+
+  // torso: lathe, flattened front-to-back
+  const prof = new THREE.SplineCurve([
+    new THREE.Vector2(0.3, -0.45), new THREE.Vector2(0.34, -0.2), new THREE.Vector2(0.35, 0.05),
+    new THREE.Vector2(0.37, 0.3), new THREE.Vector2(0.43, 0.58), new THREE.Vector2(0.49, 0.8),
+    new THREE.Vector2(0.48, 0.92), new THREE.Vector2(0.36, 1.02), new THREE.Vector2(0.19, 1.08), new THREE.Vector2(0.001, 1.1),
+  ]).getPoints(160);
+  const torso = new THREE.Mesh(new THREE.LatheGeometry(prof, 200), knit(12, 4));
+  torso.scale.set(1, 1, 0.66);
+  torso.castShadow = torso.receiveShadow = true;
+  root.add(torso);
+
+  // neck
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 0.18, 64, 1, true), fabric("#c2b8a6", 4, 1, { map: RIB }));
+  neck.position.y = 1.15;
+  root.add(neck);
+
+  // head: an egg with a dark face and a calm breathing line
+  const head = new THREE.Group();
+  head.position.set(0, 1.56, 0.02);
+  head.rotation.set(0.05, -0.28, 0.06);
+  const shell = new THREE.Group();
+  shell.scale.set(0.82, 1, 0.9);
+  head.add(shell);
+  const R = 0.38;
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(R, 160, 120), knit(12, 4.4));
+  skull.castShadow = true;
+  shell.add(skull);
+  const phiLen = 1.3, thetaLen = 0.86, thetaC = Math.PI / 2 + 0.04;
+  const faceMat = glossyBlack();
+  faceMat.alphaMap = superellipseAlpha(2.6);
+  faceMat.alphaTest = 0.5;
+  shell.add(new THREE.Mesh(new THREE.SphereGeometry(R * 1.006, 160, 96, Math.PI / 2 - phiLen / 2, phiLen, thetaC - thetaLen / 2, thetaLen), faceMat));
+  const onFace = (r) => (t, y) => {
+    const phi = Math.PI / 2 + (t - 0.5) * 0.9;
+    const theta = thetaC - y * 0.13;
+    return new THREE.Vector3(-r * Math.cos(phi) * Math.sin(theta), r * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta));
+  };
+  shell.add(pulseLine(onFace(R * 1.013), { wave: breath, color: "#bfb6ff", radius: 0.0048, glowR: 0.016 }));
+  // side sensor discs ("ears")
+  [-1, 1].forEach((side) => {
+    const ear = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 48), new THREE.MeshPhysicalMaterial({ color: "#efece6", roughness: 0.35, clearcoat: 0.4 }));
+    ear.rotation.z = Math.PI / 2;
+    ear.position.set(side * R * 0.99, 0, 0);
+    shell.add(ear);
+  });
+  root.add(head);
+
+  // arms: hang the right one, raise the left forearm to present a sensor
+  const arm = (side, elbowBend, out, swing = 0) => {
+    const shoulder = new THREE.Group();
+    shoulder.position.set(side * 0.5, 0.86, 0);
+    shoulder.rotation.set(0, side * swing, side * out, "YXZ");
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.13, 48, 32), knit(3, 2));
+    ball.castShadow = true;
+    shoulder.add(ball);
+    shoulder.add(capsule(0.1, 0.4, knit(4, 3)));
+    const elbow = new THREE.Group();
+    elbow.position.y = -0.46;
+    elbow.rotation.x = elbowBend;
+    elbow.rotation.z = -side * out * 0.6;
+    elbow.add(capsule(0.088, 0.34, knit(4, 3)));
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), knit(2, 2));
+    hand.scale.set(0.085, 0.11, 0.07);
+    hand.position.y = -0.47;
+    hand.castShadow = true;
+    elbow.add(hand);
+    shoulder.add(elbow);
+    root.add(shoulder);
+    return hand;
+  };
+  arm(-1, 0.12, 0.1);
+  const palm = arm(1, -1.3, 0.14, 0.75);
+  root.updateMatrixWorld(true);
+  root.userData.palm = palm.getWorldPosition(new THREE.Vector3());
+  return root;
+}
+
+function sensorPod(kind) {
+  const g = new THREE.Group();
+  const ceramic = new THREE.MeshPhysicalMaterial({ color: "#f4f2ee", roughness: 0.32, clearcoat: 0.5, clearcoatRoughness: 0.2 });
+  let led = new THREE.Vector3(0, 0, 0);
+  if (kind === "pebble") {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 32), ceramic);
+    m.scale.set(0.085, 0.04, 0.085);
+    g.add(m);
+    led.set(0, 0.04, 0);
+  } else if (kind === "ring") {
+    g.add(new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.018, 32, 96), ceramic));
+    led.set(0, 0.062, 0.012);
+  } else if (kind === "patch") {
+    g.add(new THREE.Mesh(new RoundedBoxGeometry(0.18, 0.11, 0.024, 6, 0.012), ceramic));
+    const win = new THREE.Mesh(new RoundedBoxGeometry(0.1, 0.05, 0.006, 4, 0.003), glossyBlack());
+    win.position.z = 0.013;
+    g.add(win);
+    led.set(0.065, 0.025, 0.014);
+  } else if (kind === "band") {
+    const prof = [];
+    const R = 0.075, th = 0.016, wd = 0.05, rr = 0.007;
+    [[R + th / 2 - rr, wd / 2 - rr, 0], [R - th / 2 + rr, wd / 2 - rr, Math.PI / 2], [R - th / 2 + rr, -wd / 2 + rr, Math.PI], [R + th / 2 - rr, -wd / 2 + rr, (3 * Math.PI) / 2]].forEach(([cx, cy, a0]) => {
+      for (let i = 0; i <= 6; i++) { const a = a0 + (i / 6) * (Math.PI / 2); prof.push(new THREE.Vector2(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr)); }
+    });
+    prof.push(prof[0].clone());
+    g.add(new THREE.Mesh(new THREE.LatheGeometry(prof.reverse(), 96), fabric("#d6ccbc", 6, 1)));
+    const pod = new THREE.Mesh(new RoundedBoxGeometry(0.05, 0.03, 0.06, 4, 0.012), ceramic);
+    pod.position.set(R + 0.018, 0, 0);
+    g.add(pod);
+    led.set(R + 0.034, 0, 0);
+  }
+  const l = new THREE.Mesh(new THREE.SphereGeometry(0.008, 16, 12), new THREE.MeshBasicMaterial({ color: TEAL, toneMapped: false }));
+  l.position.copy(led);
+  g.add(l);
+  const gl = glow(TEAL, 0.09, 0.6);
+  gl.position.copy(led);
+  g.add(gl);
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return g;
+}
+
+function orbit(radius, y, tiltX, tiltZ, opacity) {
+  const ring = new THREE.Group();
+  ring.position.y = y;
+  ring.rotation.set(tiltX, 0, tiltZ);
+  ring.add(new THREE.Mesh(new THREE.TorusGeometry(radius, 0.0035, 8, 256), new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity, depthWrite: false, toneMapped: false })));
+  ring.userData.radius = radius;
+  return ring;
+}
+
 function roundedPolygonShape(verts, r) {
   const s = new THREE.Shape();
   const n = verts.length;
@@ -357,57 +502,39 @@ const SCENES = {
     return cam;
   },
 
-  wearable() {
-    const band = new THREE.Group();
-    const R = 0.5, th = 0.08, wd = 0.42, rr = 0.034;
-    const prof = [];
-    const corners = [[R + th / 2 - rr, wd / 2 - rr, 0], [R - th / 2 + rr, wd / 2 - rr, Math.PI / 2], [R - th / 2 + rr, -wd / 2 + rr, Math.PI], [R + th / 2 - rr, -wd / 2 + rr, (3 * Math.PI) / 2]];
-    corners.forEach(([cx, cy, a0]) => {
-      for (let i = 0; i <= 10; i++) {
-        const a = a0 + (i / 10) * (Math.PI / 2);
-        prof.push(new THREE.Vector2(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr));
-      }
-    });
-    prof.push(prof[0].clone());
-    const strap = new THREE.Mesh(new THREE.LatheGeometry(prof.reverse(), 256), fabric("#d3c8b6", 26, 2));
-    strap.castShadow = true;
-    strap.receiveShadow = true;
-    band.add(strap);
+  steady() {
+    const bot = makeHumanoid();
+    bot.rotation.y = 0.12;
+    scene.add(bot);
 
-    // sensor pod on the outer surface
-    const pod = new THREE.Group();
-    const shellMat = new THREE.MeshPhysicalMaterial({ color: "#f3f1ec", roughness: 0.34, clearcoat: 0.5, clearcoatRoughness: 0.2 });
-    const shell = new THREE.Mesh(new RoundedBoxGeometry(0.48, 0.14, 0.6, 10, 0.066), shellMat);
-    shell.castShadow = true;
-    pod.add(shell);
-    const win = new THREE.Mesh(new RoundedBoxGeometry(0.32, 0.02, 0.42, 6, 0.01), glossyBlack());
-    win.position.y = 0.067;
-    pod.add(win);
-    const onPod = (t, y) => new THREE.Vector3((t - 0.5) * 0.24, 0.0785, 0.02 - y * 0.065);
-    const line = pulseLine(onPod, { radius: 0.0035, glowR: 0.011 });
-    pod.add(line);
-    pod.position.set(R + th / 2 + 0.06, 0, 0);
-    pod.rotation.z = -Math.PI / 2;
-    const pivot = new THREE.Group();
-    pivot.add(pod);
-    pivot.rotation.y = -0.55;
-    band.add(pivot);
+    // orbits around the torso carry wearable and ambient sensors
+    const o1 = orbit(0.95, 0.5, Math.PI / 2 + 0.22, 0.1, 0.55);
+    const o2 = orbit(1.18, 1.18, Math.PI / 2 - 0.16, -0.12, 0.38);
+    scene.add(o1, o2);
+    const place = (ring, angle, kind, rot = [0, 0, 0]) => {
+      const pod = sensorPod(kind);
+      pod.position.set(Math.cos(angle) * ring.userData.radius, Math.sin(angle) * ring.userData.radius, 0);
+      pod.rotation.set(...rot);
+      ring.add(pod);
+    };
+    place(o1, 3.55, "patch", [-1.2, 0, 0.3]);
+    place(o1, 2.55, "ring", [0.6, 0.4, 0]);
+    place(o1, 5.45, "pebble", [-1.3, 0, 0]);
+    place(o2, 1.0, "band", [0.9, 0.2, 0.5]);
+    place(o2, 2.75, "pebble", [-1.1, 0.3, 0]);
+    place(o2, 5.3, "ring", [0.3, 0.9, 0.2]);
 
-    // stand the band on its edge, pod on top
-    const holder = new THREE.Group();
-    band.rotation.z = Math.PI / 2;
-    holder.add(band);
-    holder.rotation.y = -0.62;
-    holder.position.y = R + th / 2;
-    holder.rotation.order = "YXZ";
-    scene.add(holder);
+    // a sensor hovering over the raised palm
+    const held = sensorPod("pebble");
+    held.position.copy(bot.userData.palm).add(new THREE.Vector3(0.0, 0.17, 0.02));
+    held.rotation.set(0.25, 0, 0.1);
+    held.scale.setScalar(1.25);
+    scene.add(held);
 
-    ground(0.18);
-    contactShadow(0.7, 0.42, 0.45);
-    lights({ key: [-3, 6, 4], keyI: 2.2, rim: [3, 2.5, -4], rimI: 1.4 });
-    const cam = new THREE.PerspectiveCamera(22, W / H, 0.1, 100);
-    cam.position.set(0.2, 3.1, 5.0);
-    cam.lookAt(0, 0.5, 0.1);
+    lights({ key: [-2.4, 6.5, 4.5], keyI: 2.0, rim: [3.5, 3.2, -3.5], rimI: 1.6 });
+    const cam = new THREE.PerspectiveCamera(24, W / H, 0.1, 100);
+    cam.position.set(0.55, 1.3, 5.5);
+    cam.lookAt(0.05, 1.08, 0);
     return cam;
   },
 
