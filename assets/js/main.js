@@ -47,6 +47,25 @@
   window.addEventListener("resize", onReveal);
   reveal();
 
+  // Footer night scene: drift the image gently as it scrolls into view
+  var scene = document.querySelector(".footer-scene");
+  var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (scene && !still) {
+    var drifting = false;
+    var drift = function () {
+      drifting = false;
+      var r = scene.getBoundingClientRect();
+      var vh = window.innerHeight;
+      if (r.bottom < 0 || r.top > vh) return;
+      var p = (vh - r.top) / (vh + r.height); // 0 entering, 1 leaving
+      scene.style.setProperty("--py", ((0.5 - p) * 70).toFixed(1) + "px");
+    };
+    var onDrift = function () { if (!drifting) { drifting = true; window.requestAnimationFrame(drift); } };
+    window.addEventListener("scroll", onDrift, { passive: true });
+    window.addEventListener("resize", onDrift);
+    drift();
+  }
+
   // Current year in the footer
   document.querySelectorAll("[data-current-year]").forEach(function (el) {
     el.textContent = String(new Date().getFullYear());
