@@ -224,7 +224,7 @@ function superellipseAlpha(n = 4, fill = 0.94) {
 
 // ---------- Objects ----------
 
-function makeGuardian({ color = "#c9bdab" } = {}) {
+function makeGuardian({ color = "#c9bdab", wave = pulse, lineColor = TEAL, arms = false } = {}) {
   const root = new THREE.Group();
 
   const profile = new THREE.SplineCurve([
@@ -276,8 +276,33 @@ function makeGuardian({ color = "#c9bdab" } = {}) {
     const theta = thetaC + 0.06 - y * 0.2;
     return new THREE.Vector3(-r * Math.cos(phi) * Math.sin(theta), r * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta));
   };
-  shell.add(pulseLine(onHead(headR * 1.012)));
+  shell.add(pulseLine(onHead(headR * 1.012), { wave, color: lineColor }));
   root.add(head);
+
+  if (arms) {
+    // short, chubby arms: one resting on the belly, one raised to present a sensor
+    const knit = fabric(color, 5, 3);
+    const limb = (side, rot) => {
+      const shoulder = new THREE.Group();
+      shoulder.position.set(side * 0.5, 0.86, 0.02);
+      shoulder.rotation.set(rot[0], rot[1], rot[2], "YXZ");
+      const joint = new THREE.Mesh(new THREE.SphereGeometry(0.15, 48, 32), knit);
+      joint.castShadow = true;
+      shoulder.add(joint);
+      shoulder.add(capsule(0.13, 0.26, knit));
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.145, 48, 32), knit);
+      hand.position.y = -0.34;
+      hand.scale.set(1, 0.92, 0.9);
+      hand.castShadow = true;
+      shoulder.add(hand);
+      root.add(shoulder);
+      return hand;
+    };
+    limb(-1, [-0.3, 0, -0.5]);
+    const palm = limb(1, [-1.15, 0.45, 0.25]);
+    root.updateMatrixWorld(true);
+    root.userData.palm = palm.getWorldPosition(new THREE.Vector3());
+  }
   return root;
 }
 
@@ -293,87 +318,6 @@ function capsule(r, len, mat) {
   const m = new THREE.Mesh(g, mat);
   m.castShadow = true;
   return m;
-}
-
-function makeHumanoid({ color = "#cdc3b2" } = {}) {
-  const root = new THREE.Group();
-  const knit = (rx, ry) => fabric(color, rx, ry);
-
-  // torso: lathe, flattened front-to-back
-  const prof = new THREE.SplineCurve([
-    new THREE.Vector2(0.3, -0.45), new THREE.Vector2(0.34, -0.2), new THREE.Vector2(0.35, 0.05),
-    new THREE.Vector2(0.37, 0.3), new THREE.Vector2(0.43, 0.58), new THREE.Vector2(0.49, 0.8),
-    new THREE.Vector2(0.48, 0.92), new THREE.Vector2(0.36, 1.02), new THREE.Vector2(0.19, 1.08), new THREE.Vector2(0.001, 1.1),
-  ]).getPoints(160);
-  const torso = new THREE.Mesh(new THREE.LatheGeometry(prof, 200), knit(12, 4));
-  torso.scale.set(1, 1, 0.66);
-  torso.castShadow = torso.receiveShadow = true;
-  root.add(torso);
-
-  // neck
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 0.18, 64, 1, true), fabric("#c2b8a6", 4, 1, { map: RIB }));
-  neck.position.y = 1.15;
-  root.add(neck);
-
-  // head: an egg with a dark face and a calm breathing line
-  const head = new THREE.Group();
-  head.position.set(0, 1.56, 0.02);
-  head.rotation.set(0.05, -0.28, 0.06);
-  const shell = new THREE.Group();
-  shell.scale.set(0.82, 1, 0.9);
-  head.add(shell);
-  const R = 0.38;
-  const skull = new THREE.Mesh(new THREE.SphereGeometry(R, 160, 120), knit(12, 4.4));
-  skull.castShadow = true;
-  shell.add(skull);
-  const phiLen = 1.3, thetaLen = 0.86, thetaC = Math.PI / 2 + 0.04;
-  const faceMat = glossyBlack();
-  faceMat.alphaMap = superellipseAlpha(2.6);
-  faceMat.alphaTest = 0.5;
-  shell.add(new THREE.Mesh(new THREE.SphereGeometry(R * 1.006, 160, 96, Math.PI / 2 - phiLen / 2, phiLen, thetaC - thetaLen / 2, thetaLen), faceMat));
-  const onFace = (r) => (t, y) => {
-    const phi = Math.PI / 2 + (t - 0.5) * 0.9;
-    const theta = thetaC - y * 0.13;
-    return new THREE.Vector3(-r * Math.cos(phi) * Math.sin(theta), r * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta));
-  };
-  shell.add(pulseLine(onFace(R * 1.013), { wave: breath, color: "#bfb6ff", radius: 0.0048, glowR: 0.016 }));
-  // side sensor discs ("ears")
-  [-1, 1].forEach((side) => {
-    const ear = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 48), new THREE.MeshPhysicalMaterial({ color: "#efece6", roughness: 0.35, clearcoat: 0.4 }));
-    ear.rotation.z = Math.PI / 2;
-    ear.position.set(side * R * 0.99, 0, 0);
-    shell.add(ear);
-  });
-  root.add(head);
-
-  // arms: hang the right one, raise the left forearm to present a sensor
-  const arm = (side, elbowBend, out, swing = 0) => {
-    const shoulder = new THREE.Group();
-    shoulder.position.set(side * 0.5, 0.86, 0);
-    shoulder.rotation.set(0, side * swing, side * out, "YXZ");
-    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.13, 48, 32), knit(3, 2));
-    ball.castShadow = true;
-    shoulder.add(ball);
-    shoulder.add(capsule(0.1, 0.4, knit(4, 3)));
-    const elbow = new THREE.Group();
-    elbow.position.y = -0.46;
-    elbow.rotation.x = elbowBend;
-    elbow.rotation.z = -side * out * 0.6;
-    elbow.add(capsule(0.088, 0.34, knit(4, 3)));
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), knit(2, 2));
-    hand.scale.set(0.085, 0.11, 0.07);
-    hand.position.y = -0.47;
-    hand.castShadow = true;
-    elbow.add(hand);
-    shoulder.add(elbow);
-    root.add(shoulder);
-    return hand;
-  };
-  arm(-1, 0.12, 0.1);
-  const palm = arm(1, -1.3, 0.14, 0.75);
-  root.updateMatrixWorld(true);
-  root.userData.palm = palm.getWorldPosition(new THREE.Vector3());
-  return root;
 }
 
 function sensorPod(kind) {
@@ -503,38 +447,41 @@ const SCENES = {
   },
 
   steady() {
-    const bot = makeHumanoid();
-    bot.rotation.y = 0.12;
+    const bot = makeGuardian({ wave: breath, lineColor: "#bfb6ff", arms: true });
+    bot.rotation.y = 0.15;
     scene.add(bot);
 
-    // orbits around the torso carry wearable and ambient sensors
-    const o1 = orbit(0.95, 0.5, Math.PI / 2 + 0.22, 0.1, 0.55);
-    const o2 = orbit(1.18, 1.18, Math.PI / 2 - 0.16, -0.12, 0.38);
+    // orbits carry wearable and ambient sensors around the companion
+    const o1 = orbit(1.1, 0.55, Math.PI / 2 + 0.2, 0.1, 0.55);
+    const o2 = orbit(1.12, 1.5, Math.PI / 2 - 0.16, -0.12, 0.4);
     scene.add(o1, o2);
     const place = (ring, angle, kind, rot = [0, 0, 0]) => {
       const pod = sensorPod(kind);
       pod.position.set(Math.cos(angle) * ring.userData.radius, Math.sin(angle) * ring.userData.radius, 0);
       pod.rotation.set(...rot);
+      pod.scale.setScalar(1.25);
       ring.add(pod);
     };
     place(o1, 3.55, "patch", [-1.2, 0, 0.3]);
     place(o1, 2.55, "ring", [0.6, 0.4, 0]);
-    place(o1, 5.45, "pebble", [-1.3, 0, 0]);
+    place(o1, 4.35, "pebble", [-1.3, 0, 0]);
     place(o2, 1.0, "band", [0.9, 0.2, 0.5]);
     place(o2, 2.75, "pebble", [-1.1, 0.3, 0]);
-    place(o2, 5.3, "ring", [0.3, 0.9, 0.2]);
+    place(o2, 5.95, "ring", [0.3, 0.9, 0.2]);
 
-    // a sensor hovering over the raised palm
+    // a sensor hovering over the raised hand
     const held = sensorPod("pebble");
-    held.position.copy(bot.userData.palm).add(new THREE.Vector3(0.0, 0.17, 0.02));
+    held.position.copy(bot.userData.palm).add(new THREE.Vector3(0.02, 0.24, 0.04));
     held.rotation.set(0.25, 0, 0.1);
-    held.scale.setScalar(1.25);
+    held.scale.setScalar(1.5);
     scene.add(held);
 
-    lights({ key: [-2.4, 6.5, 4.5], keyI: 2.0, rim: [3.5, 3.2, -3.5], rimI: 1.6 });
+    ground(0.16);
+    contactShadow(1.0, 0.8, 0.42);
+    lights({ key: [-1.8, 7, 3.4], keyI: 2.0, rim: [3.5, 3.2, -3.5], rimI: 1.4 });
     const cam = new THREE.PerspectiveCamera(24, W / H, 0.1, 100);
-    cam.position.set(0.55, 1.3, 5.5);
-    cam.lookAt(0.05, 1.08, 0);
+    cam.position.set(0.9, 1.45, 6.6);
+    cam.lookAt(0, 1.05, 0);
     return cam;
   },
 

@@ -34,7 +34,7 @@ node tools/render/capture.mjs guardian 1800 2250 /tmp/guardian.png
 python3 tools/render/finish.py /tmp/guardian.png assets/img/guardian.webp 1200 1500
 ```
 
-Scenes: `guardian` (hero, 1200x1500), `guardianDetail` and `steady` (1800x1200, use `--no-feather`), and `home` (1800x1200). Keep each render at or below 2400 px wide; larger canvases are clipped by the software renderer.
+Scenes: `guardian` (hero, 1200x1500), `guardianDetail` (1800x1200, use `--no-feather`), `steady` and `home` (1800x1200). Keep each render at or below 2400 px wide; larger canvases are clipped by the software renderer.
 
 ## Preview locally
 
