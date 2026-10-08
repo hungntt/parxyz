@@ -1,6 +1,6 @@
 # Parxyz website
 
-Static company website for **Parxyz** (parxyz.uk), hosted on GitHub Pages. Plain HTML, CSS and JavaScript with no build step and no third-party requests (fonts are self-hosted).
+Static company website for **Parxyz** (parxyz.uk), hosted on GitHub Pages. Plain HTML, CSS and JavaScript with no build step and no third-party requests (the Geist fonts are self-hosted). The visual style follows a minimal, image-led product-site look: large concept renders, uppercase micro-navigation and two-tone headlines.
 
 ## Structure
 
@@ -13,6 +13,7 @@ Static company website for **Parxyz** (parxyz.uk), hosted on GitHub Pages. Plain
 | `data/publications.json` | Source of truth for publications |
 | `scripts/build_publications.py` | Renders the JSON into `publications.html` and the featured list in `index.html` |
 | `assets/` | CSS, JS, fonts and images |
+| `tools/render/` | Three.js scenes that produce the product concept renders in `assets/img/` |
 
 ## Updating publications
 
@@ -20,6 +21,20 @@ Static company website for **Parxyz** (parxyz.uk), hosted on GitHub Pages. Plain
    Tags: `mental`, `aging`, `robotics`, `clinical`, `xai`, `edge`, `agents`.
 2. Run `python3 scripts/build_publications.py`.
 3. Commit and push. GitHub Pages redeploys automatically.
+
+## Product images
+
+The images in `assets/img/` (`guardian.webp`, `guardian-detail.webp`, `heart2mind.webp`, `home.webp`) are procedural 3D concept renders, not photographs. To replace one with a real photo, keep the same file name and size ratio, or update the `<img>` tag in `index.html`. Transparent-background images sit on the coloured card backgrounds defined in `assets/css/style.css`.
+
+To re-render after editing `tools/render/scenes.js`:
+
+```sh
+python3 -m http.server 8765 &
+node tools/render/capture.mjs guardian 1800 2250 /tmp/guardian.png
+python3 tools/render/finish.py /tmp/guardian.png assets/img/guardian.webp 1200 1500
+```
+
+Scenes: `guardian` (hero, 1200x1500), `guardianDetail` (1800x1200, use `--no-feather`), `wearable` and `home` (1800x1200). Keep each render at or below 2400 px wide; larger canvases are clipped by the software renderer.
 
 ## Preview locally
 
