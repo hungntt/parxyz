@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://parxyz.uk/sitemap.xml
